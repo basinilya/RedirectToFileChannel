@@ -1,0 +1,15 @@
+# Auto detect text files and perform LF normalization
+*        text=auto
+
+# Windows CMD does not like LF in batch files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Eclipse always saves its files with platform endings
+.classpath text
+.project text
+.settings/** text
+*.launch text
+
+# prettier diff
+*.java   text diff=java
