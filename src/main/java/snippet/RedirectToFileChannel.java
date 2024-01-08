@@ -46,7 +46,7 @@ public class RedirectToFileChannel {
                 + "file, then, while the process is still live, the temporary file will be renamed "
                 + "to contain the PID in its name.");
         log(
-            "Redirecting native standard I/O helps troubleshoot when a log framework can't print crash logs.");
+            "Redirecting native standard I/O helps troubleshoot when your favorite log framework can't print crash logs.");
         log(
             "And redirecting to an already opened File Channel allows log rotation on Windows (to some degree).");
         log(
@@ -80,21 +80,44 @@ public class RedirectToFileChannel {
         }
     }
 
-    private static void fakeshell() throws IOException {
+    private static void fakeshell() throws Exception {
         System.out.println("fake shell");
         final BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
         String line;
         while (null != (line = in.readLine())) {
             final String command = line.replaceFirst(">&2", "");
+            final boolean isOut = command.equals(line);
             @SuppressWarnings("resource")
-            final PrintStream out = command.equals(line) ? System.out : System.err;
+            final PrintStream out = isOut ? System.out : System.err;
             final String args = command.replaceFirst("^echo ", "");
             if (args.equals(command)) {
                 System.err.println("unknown command: " + command);
             } else {
-                out.println(args);
+                out.println((isOut ? "[STDOUT] " : "[STDERR] ") + args);
             }
         }
+        crash();
+    }
+
+    private static void crash()
+                                throws NoSuchFieldException,
+                                    SecurityException,
+                                    IllegalArgumentException,
+                                    IllegalAccessException {
+        // https://stackoverflow.com/questions/55397570/can-java-code-cause-segmentation-fault-in-linux
+        final Field theUnsafe = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        theUnsafe.setAccessible(true);
+        final sun.misc.Unsafe unsafe = (sun.misc.Unsafe) theUnsafe.get(null);
+
+        final long ten = 10;
+        final byte size = 1;
+        final long mem = unsafe.allocateMemory(size);
+        // Put here the wrong address!!!
+        unsafe.putAddress(1, ten);
+        // With this will work:
+        // unsafe.putAddress(mem, ten);
+        final long readValue = unsafe.getAddress(mem);
+        System.out.println("result: " + readValue);
     }
 
     private static final String LS = System.lineSeparator();
@@ -165,6 +188,7 @@ public class RedirectToFileChannel {
             System.getProperty("java.home") + "/bin/java",
             "-cp",
             System.getProperty("java.class.path"),
+            "-Xmx20M",
             RedirectToFileChannel.class.getName(),
             FAKESHELL };
     }
